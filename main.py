@@ -1,28 +1,39 @@
-
+from discord.enums import NotificationLevel
 import discord
+from discord.ext import commands
 import os
-import psycopg2
+from database.database import DBConnection
+
 
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
-SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD')
-print(SERVER_PASSWORD)
 
-# connection = psycopg2.connect(host="localhost", port="5432", database="main", user="postgres", password=)
+bookieDB = DBConnection()
 
-# client = discord.Client()
+bot = commands.Bot(command_prefix = "$")
 
-# @client.event
-# async def on_ready():
-#     print('We have logged in as {0.user}'.format(client))
+@bot.event
+async def on_ready():
+    print("------------------------------")
+    print("API Version: {0}".format(discord.__version__))
+    print('We have logged in as {0.user}'.format(bot))
+    print("------------------------------")
 
-# @client.event
+# @bot.event
 # async def on_message(message):
-#     if message.author == client.user:
+#     if message.author == bot.user:
 #         return
 
 #     if message.content.startswith('$hello'):
 #         await message.channel.send('Hello!') 
     
 #     if message.content.startswith('$close'):
-#         await client.close()
-# client.run(DISCORD_TOKEN)
+#         bookieDB.close()
+#         await bot.close()
+#     await bot.process_commands(message)
+
+@bot.command()
+async def shutdown(ctx):
+    bookieDB.close()
+    await bot.close()
+
+bot.run(DISCORD_TOKEN)
