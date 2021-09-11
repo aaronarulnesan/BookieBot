@@ -1,3 +1,4 @@
+from discord.ext.commands.core import command
 from database.config import config
 import psycopg2
 from psycopg2.extensions import AsIs
@@ -8,64 +9,74 @@ from psycopg2.extensions import AsIs
 
 class DBManagement:
 
+    # initilizes DBManagement object 
+    # opens new connection and cursor
+    # inits tables if they do not already exist
     def __init__(self):
         params = config()
         print('Connecting to the BookieBot database ...')
         try:
             self.conn = psycopg2.connect(**params)
             self.cur = self.conn.cursor()
-            self.initTables()
+            self.initDatabase()
             print('Connected to BookieBot database')
         except(Exception, psycopg2.DatabaseError) as error:
             print(error)
 
-
+    # close cursor and connection to database
     def close(self):
-        self.cur.close()
-        self.conn.close()
-        print('BookieBot database connection closed')
-
-    def initTables(self):
-        commands = (
-            """ CREATE TABLE IF NOT EXISTS wagers (
-	            wager_id VARCHAR(255) NOT NULL,
-	            wager_choices VARCHAR(255),
-                PRIMARY KEY(wager_id)
-            );
-            """,
-            """ CREATE TABLE IF NOT EXISTS players (
-	            player_id VARCHAR(255),
-                PRIMARY KEY(player_id)
-            );
-            """,
-            """ CREATE TABLE IF NOT EXISTS bets (
-	            bet_id SERIAL,
-	            bet_value NUMERIC(3) NOT NULL,
-                PRIMARY KEY(bet_id),
-                wager_id VARCHAR(255) references wagers ON UPDATE CASCADE ON DELETE CASCADE,
-                player_id VARCHAR(255) references players ON UPDATE CASCADE ON DELETE CASCADE
-            );
-            """
-        )
         try:
-            for command in commands:
-                self.cur.execute(command);
+            self.cur.close()
+            self.conn.close()
+            print('BookieBot database connection closed')
+        except(Exception, psycopg2.DatabaseError) as error:
+            print(error)
+
+    # initializes tables and functions
+    def initDatabase(self):
+        try:
+            self.cur.execute(open("database/sql/initDatabase.sql", "r").read());
             self.conn.commit()
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
-        print('Tables initialized');
+        print('Database Ready');
 
+    # inserts a wager without outcomes into wagers table
     def insertWager(self, wagerName):
-        command = """INSERT INTO wagers(wager_id)
+        command = """INSERT INTO wagers(wager_name)
                     VALUES('%s') 
-                    RETURNING wager_id"""
-        wager_id = None
-        print(wagerName)
+                    RETURNING wager_name"""
+        wager_name = None
         try:
             self.cur.execute(command, (AsIs(wagerName),))
-            wager_id = self.cur.fetchone()[0]
+            wager_name = self.cur.fetchone()[0]
             self.conn.commit()
-            
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
-        print("{} has been inserted".format(wager_id))
+        print("{} has been inserted".format(wager_name))
+    
+    # insert an Outcome and links it to a wager
+    def insertOutcome(self, wagerName, outcomeName):
+        try:
+            wager_id = self.findWagerID(wagerName)
+            command = """INSERT INTO outcomes(outcome_name, wager_id)
+                        VALUES( '%s', '%s')
+                        RETURNING outcome_name"""
+            try:
+                self.cur.execute(command, (AsIs(outcomeName), wager_id))
+                self.conn.commit()
+                print("Outcome: {} has been made and placed under {}".format(outcomeName, wagerName))
+            except (Exception, psycopg2.DatabaseError) as error:
+                print(error)
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+    
+
+    def findWagerID(self, wagerName):
+        try:
+            self.cur.callproc('get_wager_id', (wagerName,))
+            wager_id = self.cur.fetchone()[0]
+            return wager_id
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+
