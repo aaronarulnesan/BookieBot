@@ -2,12 +2,13 @@ from discord.enums import NotificationLevel
 import discord
 from discord.ext import commands
 import os
-from database.database import DBConnection
+from database.database import *
+import traceback
 
 
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
 
-bookieDB = DBConnection()
+bookieDB = DBManagement()
 
 bot = commands.Bot(command_prefix = "$")
 
@@ -35,5 +36,19 @@ async def on_ready():
 async def shutdown(ctx):
     bookieDB.close()
     await bot.close()
+
+@bot.command()
+async def makeWager(ctx, *, wagerName):
+    wager = wagerName
+    if (len(wager)>255):
+        wager = wager[0:221] + '...'
+    bookieDB.insertWager(wager)
+    await ctx.send("Wager: {} has been made!".format(wager))
+
+@makeWager.error
+async def makeWagerHandler(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Did not input a name for the wager")
+
 
 bot.run(DISCORD_TOKEN)
